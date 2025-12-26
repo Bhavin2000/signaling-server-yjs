@@ -9,7 +9,6 @@ const map = require('lib0/dist/map.cjs');
 const wsReadyStateConnecting = 0;
 const wsReadyStateOpen = 1;
 
-// Managing Rooms
 const docs = new Map();
 
 const messageSync = 0;
@@ -35,10 +34,13 @@ class WSSharedDoc extends Y.Doc {
       const changedClients = added.concat(updated).concat(removed);
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, messageAwareness);
-      // 🟢 FIX: Changed writeAwarenessUpdate to encodeAwarenessUpdate
-      awarenessProtocol.encodeAwarenessUpdate(encoder, this.awareness, changedClients);
-      const buff = encoding.toUint8Array(encoder);
-      this.conns.forEach((_, conn) => send(this, conn, buff));
+      
+      // 🟢 FIX 1: Generate buffer first, then write it with Length Prefix
+      const buff = awarenessProtocol.encodeAwarenessUpdate(this.awareness, changedClients);
+      encoding.writeVarUint8Array(encoder, buff);
+      
+      const message = encoding.toUint8Array(encoder);
+      this.conns.forEach((_, conn) => send(this, conn, message));
     };
     this.awareness.on('update', awarenessChangeHandler);
     this.on('update', updateHandler);
@@ -83,16 +85,22 @@ const setupWSConnection = (conn, req, { docName = req.url.slice(1).split('?')[0]
   });
 
   {
+    // Send Sync Step 1
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);
     syncProtocol.writeSyncStep1(encoder, doc);
     send(doc, conn, encoding.toUint8Array(encoder));
+    
+    // Send Initial Awareness
     const awarenessStates = doc.awareness.getStates();
     if (awarenessStates.size > 0) {
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, messageAwareness);
-      // 🟢 FIX: Changed writeAwarenessUpdate to encodeAwarenessUpdate
-      awarenessProtocol.encodeAwarenessUpdate(encoder, doc.awareness, Array.from(awarenessStates.keys()));
+      
+      // 🟢 FIX 2: Generate buffer first, then write it with Length Prefix
+      const buff = awarenessProtocol.encodeAwarenessUpdate(doc.awareness, Array.from(awarenessStates.keys()));
+      encoding.writeVarUint8Array(encoder, buff);
+      
       send(doc, conn, encoding.toUint8Array(encoder));
     }
   }
