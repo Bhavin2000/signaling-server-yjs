@@ -1,13 +1,12 @@
 {
-    "name": "my-p2p-signal",
-    "version": "1.0.0",
-    "engines": {
-        "node": "18.x"
-    },
+    "name": "yjs-tunnel-server",
     "scripts": {
         "start": "node server.js"
     },
     "dependencies": {
-        "ws": "^8.16.0"
+        "ws": "^8.16.0",
+        "yjs": "^13.6.0",
+        "y-protocols": "^1.0.6",
+        "lib0": "^0.2.8"
     }
 }
